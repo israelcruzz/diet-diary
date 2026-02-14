@@ -1,0 +1,35 @@
+org: israelcruzworktest
+service: diet-diary
+
+plugins:
+  - serverless-offline
+
+package: 
+  individually: true
+
+build:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    external:
+      - "@aws-sdk/*"
+    exclude:
+      - "@aws-sdk/*"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  memorySize: 128
+  timeout: 10
+  architecture: arm64
+  stage: ${opt:stage, 'dev'}
+
+functions:
+  hello:
+    handler: src/main/functions/helloHandler.hello
+    events:
+      - httpApi:
+          path: /
+          method: get
