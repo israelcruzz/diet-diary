@@ -1,5 +1,6 @@
+import { getMetadata } from "@kernel/decorators/Schema"
 import { APIGatewayProxyResultV2 } from "aws-lambda"
-import { ZodSchema } from "zod/v3"
+import { ZodError } from "zod"
 
 export type TRouteType = "private" | "public"
 
@@ -39,8 +40,6 @@ export namespace Controller {
 }
 
 export abstract class BaseController<TType extends TRouteType> {
-    protected schema: ZodSchema | null = null
-
     public async execute(request: Controller.Request<TType>) {
         const body = this.validateBody(request.body)
 
@@ -51,12 +50,19 @@ export abstract class BaseController<TType extends TRouteType> {
     }
 
     private validateBody(body: Controller.Request<"public">["body"]) {
-        // TODO: get schema via decorators
-        if (!this.schema) {
+        const schema = getMetadata(this)
+
+        if (!schema) {
             return body
         }
 
-        return this.schema.safeParse(body)
+        const validateBody = schema.safeParse(body)
+
+        if (!validateBody.success) {
+            throw new ZodError(validateBody.error.issues)
+        }
+
+        return validateBody.data
     }
 
     protected abstract handler(request: Controller.Request<TType>): Promise<APIGatewayProxyResultV2>
