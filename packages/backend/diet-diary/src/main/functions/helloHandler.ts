@@ -1,15 +1,4 @@
-import { APIGatewayProxyEventV2 } from "aws-lambda";
+import { HelloController } from "@application/controlllers/HelloController";
+import { lambdaHttpAdapter } from "@main/adapters/lambdaHttpAdapter";
 
-export const hello = async (event: APIGatewayProxyEventV2) => {
-  return {
-    statusCode: 200,
-    body: JSON.stringify(
-      {
-        message: 'Hello World!',
-        input: event,
-      },
-      null,
-      2
-    ),
-  };
-}
+export const handler = lambdaHttpAdapter(HelloController)
