@@ -9,13 +9,7 @@ package:
 
 build:
   esbuild:
-    bundle: true
-    minify: true
-    sourcemap: false
-    external:
-      - "@aws-sdk/*"
-    exclude:
-      - "@aws-sdk/*"
+    configFile: ./esbuild.config.mjs
 
 provider:
   name: aws

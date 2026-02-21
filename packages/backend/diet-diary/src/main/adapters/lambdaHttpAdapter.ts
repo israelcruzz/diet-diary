@@ -10,7 +10,7 @@ export type Constructor<T = any> = new (...args: any) => T
 export const lambdaHttpAdapter = (controller: Constructor) => {
     return async (event: Event) => {
         try {
-            const httpController = new controller() as unknown as BaseController<any>
+            const httpController = controller as unknown as BaseController<any>
 
             const bodyParsed: Record<string, unknown> = lambdaBodyParser(event.body)
             const queryParams: Record<string, unknown> = event.queryStringParameters ?? {}
