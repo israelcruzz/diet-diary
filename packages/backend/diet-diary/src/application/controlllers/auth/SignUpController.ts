@@ -5,8 +5,10 @@ import { schema } from "@application/controlllers/auth/schemas/signUpSchema";
 import { InitiateAuthCommand, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { cognitoClient } from "@infra/clients/cognitoClient";
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import ksuid from "ksuid";
 import { dynamoDbClient } from "@infra/clients/dynamoClient";
+import { Account } from "@application/entities/Account";
+import { ulid } from "ulid";
+import { AccountItem } from "@infra/database/dynamodb/items/AccountItem";
 
 @Schema(schema)
 @Injectable()
@@ -43,8 +45,17 @@ export class SignUpController extends BaseController<"public"> {
 
       const { UserSub } = await cognitoClient.send(cognitoSignUpCommand)
 
-      const randomKsuid = await ksuid.random()
-      const userId = randomKsuid.string
+      if (!UserSub) {
+        return {
+          statusCode: 500,
+          body: {
+            message: "Internal Server Error"
+          }
+        }
+      }
+
+      const randomULID = ulid()
+      const userId = randomULID
 
       // const createAccount = new PutCommand({
       //   TableName: process.env.MAIN_TABLE_NAME,
@@ -73,17 +84,18 @@ export class SignUpController extends BaseController<"public"> {
       //   }
       // })
 
+      const account = new Account({
+        email: email as string,
+        externalId: UserSub as string,
+        id: userId
+      })
+
+      const accountItem = AccountItem.fromEntity(account)
+
       const createAccount = new PutCommand({
         TableName: process.env.MAIN_TABLE_NAME,
         Item: {
-          PK: `ACCOUNT#${UserSub}`,
-          SK: `ACCOUNT#${UserSub}`,
-          GSI1PK: `ACCOUNT#${email}`,
-          GSI1SK: `ACCOUNT#${UserSub}`,
-          type: "account",
-          id: userId,
-          email: email,
-          externalId: UserSub
+          ...accountItem.toItem()
         }
       })
 
