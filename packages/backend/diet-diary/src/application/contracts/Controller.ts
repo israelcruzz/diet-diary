@@ -39,6 +39,18 @@ export namespace Controller {
     > = TType extends "public" ? PublicRequest<TBody, TParams, TQueryParams> : PrivateRequest<TBody, TParams, TQueryParams>
 }
 
+export type Response = {
+    statusCode?: number | undefined;
+    headers?:
+    | {
+        [header: string]: boolean | number | string;
+    }
+    | undefined;
+    body?: string | Record<string, unknown> | undefined;
+    isBase64Encoded?: boolean | undefined;
+    cookies?: string[] | undefined;
+}
+
 export abstract class BaseController<TType extends TRouteType> {
     public async execute(request: Controller.Request<TType>) {
         const body = this.validateBody(request.body)
@@ -65,5 +77,5 @@ export abstract class BaseController<TType extends TRouteType> {
         return validateBody.data
     }
 
-    protected abstract handler(request: Controller.Request<TType>): Promise<APIGatewayProxyResultV2>
+    protected abstract handler(request: Controller.Request<TType>): Promise<Response>
 }

@@ -11,6 +11,10 @@ build:
   esbuild:
     configFile: ./esbuild.config.mjs
 
+custom:
+  cognito:
+    PoolName: ${self:service}-${self:provider.stage}-user-pool
+
 provider:
   name: aws
   runtime: nodejs20.x
@@ -31,6 +35,22 @@ functions:
       - httpApi:
           path: /
           method: post
+
+  signUp:
+    handler: src/main/functions/auth/signUpHandler.handler
+    events:
+      - httpApi:
+          path: /auth/sign-up
+          method: post
+
+  cognitoPreSignUpTrigger:
+    handler: src/main/functions/auth/cognito/preSignUpTrigger.handler
+    events:
+      - cognitoUserPool:
+          pool: ${self:custom.cognito.PoolName}
+          trigger: PreSignUp
+          existing: true
+          forceDeploy: true
 
 resources:
   Resources:
