@@ -4,7 +4,7 @@ service: diet-diary
 plugins:
   - serverless-offline
 
-package: 
+package:
   individually: true
 
 build:
@@ -27,6 +27,19 @@ provider:
     MAIN_TABLE_NAME: ${self:service}-${self:provider.stage}-main-table
     USER_POOL_ID: !Ref UserPool
     USER_POOL_CLIENT_ID: !Ref UserPoolClient
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+          Resource:
+            - !GetAtt MainTable.Arn
+            - !Sub "${MainTable.Arn}/index/*"
 
 functions:
   hello:
@@ -92,7 +105,7 @@ resources:
         RefreshTokenRotation:
           Feature: ENABLED
           RetryGracePeriodSeconds: 0
-    
+
     MainTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -110,9 +123,9 @@ resources:
             AttributeType: S
           - AttributeName: SK
             AttributeType: S
-          - AttributeName: GS1PK
+          - AttributeName: GSI1PK
             AttributeType: S
-          - AttributeName: GS1SK
+          - AttributeName: GSI1SK
             AttributeType: S
         KeySchema:
           - AttributeName: PK
@@ -124,11 +137,10 @@ resources:
             Projection:
               ProjectionType: ALL
             KeySchema:
-              - AttributeName: GS1PK
+              - AttributeName: GSI1PK
                 KeyType: HASH
-              - AttributeName: GS1SK
+              - AttributeName: GSI1SK
                 KeyType: RANGE
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
-              
