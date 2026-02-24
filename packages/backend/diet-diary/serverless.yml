@@ -19,6 +19,10 @@ provider:
   timeout: 10
   architecture: arm64
   stage: ${opt:stage, 'dev'}
+  environment:
+    MAIN_TABLE_NAME: ${self:service}-${self:provider.stage}-main-table
+    USER_POOL_ID: !Ref UserPool
+    USER_POOL_CLIENT_ID: !Ref UserPoolClient
 
 functions:
   hello:
@@ -27,3 +31,84 @@ functions:
       - httpApi:
           path: /
           method: post
+
+resources:
+  Resources:
+    UserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-${self:provider.stage}-user-pool
+        UsernameAttributes:
+          - email
+        UsernameConfiguration:
+          CaseSensitive: true
+        MfaConfiguration: OFF
+        AccountRecoverySetting:
+          RecoveryMechanisms:
+            - Name: verified_email
+              Priority: 1
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: false
+        # DeletionProtection: ACTIVE
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireUppercase: true
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+
+    UserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-${self:provider.stage}-UserPoolClient
+        UserPoolId: !Ref UserPool
+        # GenerateSecret: true
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+        TokenValidityUnits:
+          AccessToken: hours
+        AccessTokenValidity: 12
+        RefreshTokenRotation:
+          Feature: ENABLED
+          RetryGracePeriodSeconds: 0
+    
+    MainTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-main-table
+        BillingMode: PROVISIONED
+        DeletionProtectionEnabled: false
+        # PointInTimeRecoverySpecification:
+        #   PointInTimeRecoveryEnabled: false
+        #   RecoveryPeriodInDays: 30
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: GS1PK
+            AttributeType: S
+          - AttributeName: GS1SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            Projection:
+              ProjectionType: ALL
+            KeySchema:
+              - AttributeName: GS1PK
+                KeyType: HASH
+              - AttributeName: GS1SK
+                KeyType: RANGE
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+              
