@@ -1,9 +1,13 @@
 {
+  "scripts": {
+    "dev:email": "email dev --dir src/infra/emails/templates"
+  },
   "devDependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.996.0",
     "@types/aws-lambda": "^8.10.160",
     "@types/express": "^5.0.6",
     "@types/node": "^25.2.3",
+    "@types/react": "^19.2.14",
     "eslint": "^10.0.0",
     "serverless-offline": "^14.4.0",
     "typescript": "^5.9.3"
@@ -14,8 +18,10 @@
     "@aws-sdk/client-sqs": "^3.996.0",
     "@aws-sdk/lib-dynamodb": "^3.996.0",
     "@aws-sdk/s3-presigned-post": "^3.996.0",
+    "@react-email/components": "^1.0.8",
     "esbuild-plugin-tsc": "^0.5.0",
     "ksuid": "^3.0.0",
+    "react": "^19.2.4",
     "reflect-metadata": "^0.2.2",
     "ulid": "^3.0.2",
     "zod": "^4.3.6"

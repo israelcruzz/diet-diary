@@ -27,7 +27,9 @@ export class AccountItem {
         PK: this.getPK(account.id),
         SK: this.getSK(account.id),
         GSI1PK: this.getGSI1PK(account.email),
-        GSI1SK: this.getGSI1SK(account.id)
+        GSI1SK: this.getGSI1SK(account.id),
+        GSI2PK: this.getGSI1PK(account.externalId),
+        GSI2SK: this.getGSI1SK(account.id)
       }
     )
   }
@@ -55,6 +57,14 @@ export class AccountItem {
   public static getGSI1SK(accountId: string): AccountItem.Keys["GSI1SK"] {
     return `ACCOUNT#${accountId}`
   }
+
+  public static getGSI2PK(externalId: string): AccountItem.Keys["GSI2PK"] {
+    return `ACCOUNT#${externalId}`
+  }
+
+  public static getGSI2SK(accountId: string): AccountItem.Keys["GSI2SK"] {
+    return `ACCOUNT#${accountId}`
+  }
 }
 
 export namespace AccountItem {
@@ -63,6 +73,8 @@ export namespace AccountItem {
     SK: `ACCOUNT#${string}`;
     GSI1PK: `ACCOUNT#${string}`;
     GSI1SK: `ACCOUNT#${string}`;
+    GSI2PK: `ACCOUNT#${string}`;
+    GSI2SK: `ACCOUNT#${string}`;
   }
 
   export type Attributes = Account.Attributes

@@ -1,32 +1,31 @@
+import z from "zod";
+import AuthGateway from "@infra/gateways/AuthGateway";
+import AccountRepository from "@infra/repositories/AccountRepository";
 import { BaseController, Controller, Response } from "@application/contracts/Controller";
 import { Injectable } from "@kernel/decorators/Injectable";
 import { Schema } from "@kernel/decorators/Schema";
-import { schema } from "@application/controlllers/auth/schemas/signUpSchema";
-import { InitiateAuthCommand, SignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
-import { cognitoClient } from "@infra/clients/cognitoClient";
-import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { dynamoDbClient } from "@infra/clients/dynamoClient";
+import { accountSchema, profileSchema, schema } from "@application/controlllers/auth/schemas/signUpSchema";
 import { Account } from "@application/entities/Account";
 import { ulid } from "ulid";
-import { AccountItem } from "@infra/database/dynamodb/items/AccountItem";
+import { Profile } from "@application/entities/Profile";
+import { GoalCalculator } from "@application/services/GoalCalculator";
+import { Goal } from "@application/entities/Goal";
+import { Saga } from "@shared/saga/Saga";
+import { SignUpUow } from "@shared/uow/SignUpUow";
 
 @Schema(schema)
 @Injectable()
 export class SignUpController extends BaseController<"public"> {
+  private readonly saga: Saga = new Saga();
+
   override async handler(request: Controller.Request<"public">): Promise<Response> {
-    try {
-      const { email, password } = request.body;
+    return await this.saga.run<Response>(async () => {
+      const body = request.body as z.infer<typeof schema>;
 
-      const getAccountCommand = new QueryCommand({
-        TableName: process.env.MAIN_TABLE_NAME,
-        IndexName: "GSI1",
-        KeyConditionExpression: "GSI1PK = :email",
-        ExpressionAttributeValues: {
-          ":email": `ACCOUNT#${email}`
-        }
-      })
+      const { email, password } = body.account as unknown as z.infer<typeof accountSchema>;
+      const { goal: profileGoal } = body.account as unknown as z.infer<typeof profileSchema>;
 
-      const { Items } = await dynamoDbClient.send(getAccountCommand)
+      const { Items } = await AccountRepository.findByEmail(email);
 
       if (Items && Items.length > 0) {
         return {
@@ -36,16 +35,12 @@ export class SignUpController extends BaseController<"public"> {
           }
         }
       }
-
-      const cognitoSignUpCommand = new SignUpCommand({
-        ClientId: process.env.USER_POOL_CLIENT_ID,
-        Username: email as string,
-        Password: password as string
+      const userSub = await AuthGateway.signUp({
+        email,
+        password
       })
 
-      const { UserSub } = await cognitoClient.send(cognitoSignUpCommand)
-
-      if (!UserSub) {
+      if (!userSub) {
         return {
           statusCode: 500,
           body: {
@@ -54,79 +49,52 @@ export class SignUpController extends BaseController<"public"> {
         }
       }
 
-      const randomULID = ulid()
-      const userId = randomULID
+      this.saga.addCompensate(() => AuthGateway.deleteUser({ userId: userSub }))
 
-      // const createAccount = new PutCommand({
-      //   TableName: process.env.MAIN_TABLE_NAME,
-      //   ExpressionAttributeNames: {
-      //     "#type": "type",
-      //     "#id": "id",
-      //     "#email": "email",
-      //     "#externalId": "externalId"
-      //   },
-      //   ExpressionAttributeValues: {
-      //       ":account": "account",
-      //       ":userId": userId,
-      //       ":email": email,
-      //       ":externalId": UserSub
-      //   },
-      //   Item: {
-      //     PK: `ACCOUNT#${UserSub}`,
-      //     SK: `ACCOUNT#${UserSub}`,
-      //     GSI1PK: `ACCOUNT#${email}`,
-      //     GSI1SK: `ACCOUNT#${UserSub}`,
-
-      //     "#type": ":account",
-      //     "#id": ":userId",
-      //     "#email": ":email",
-      //     "#externalId": ":externalId"
-      //   }
-      // })
+      const userId = ulid()
 
       const account = new Account({
         email: email as string,
-        externalId: UserSub as string,
+        externalId: userSub as string,
         id: userId
       })
 
-      const accountItem = AccountItem.fromEntity(account)
-
-      const createAccount = new PutCommand({
-        TableName: process.env.MAIN_TABLE_NAME,
-        Item: {
-          ...accountItem.toItem()
-        }
+      const profile = new Profile({
+        accountId: userId,
+        ...body.profile
       })
 
-      await dynamoDbClient.send(createAccount)
+      const goalCalculator = GoalCalculator.calculate(profile)
 
-      const cognitoSignInCommand = new InitiateAuthCommand({
-        AuthFlow: "USER_PASSWORD_AUTH",
-        ClientId: process.env.USER_POOL_CLIENT_ID,
-        AuthParameters: {
-          USERNAME: email as string,
-          PASSWORD: password as string
-        }
+      const goal = new Goal({
+        accountId: userId,
+        goal: profileGoal,
+        callories: goalCalculator.calories,
+        carbohydrates: goalCalculator.carbohydrates,
+        fats: goalCalculator.fats,
+        proteins: goalCalculator.proteins
       })
 
-      const { AuthenticationResult } = await cognitoClient.send(cognitoSignInCommand)
+      const signUpUow = new SignUpUow({
+        account,
+        goal,
+        profile
+      })
+
+      await signUpUow.run()
+
+      const { accessToken, refreshToken } = await AuthGateway.signIn({
+        email,
+        password
+      })
 
       return {
         statusCode: 201,
         body: {
-          accessToken: AuthenticationResult?.AccessToken,
-          refreshToken: AuthenticationResult?.RefreshToken
+          accessToken,
+          refreshToken
         }
       }
-    } catch (error) {
-      console.error("[SignUpController.handler]" + error)
-      return {
-        statusCode: 500,
-        body: {
-          message: "Internal server error"
-        }
-      }
-    }
+    })
   }
 }

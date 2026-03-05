@@ -27,6 +27,16 @@ provider:
     MAIN_TABLE_NAME: ${self:service}-${self:provider.stage}-main-table
     USER_POOL_ID: !Ref UserPool
     USER_POOL_CLIENT_ID: !Ref UserPoolClient
+    NODE_ENV: ${env:NODE_ENV}
+  httpApi:
+    authorizers:
+      CognitoAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: !GetAtt UserPool.ProviderURL
+        audience:
+          - !Ref UserPoolClient
+
   iam:
     role:
       statements:
@@ -40,6 +50,9 @@ provider:
           Resource:
             - !GetAtt MainTable.Arn
             - !Sub "${MainTable.Arn}/index/*"
+        - Effect: Allow
+          Action: cognito-idp:AdminDeleteUser
+          Resource: !GetAtt UserPool.Arn
 
 functions:
   hello:
@@ -48,6 +61,7 @@ functions:
       - httpApi:
           path: /
           method: post
+          authorizer: CognitoAuthorizer
 
   signUp:
     handler: src/main/functions/auth/signUpHandler.handler
@@ -56,12 +70,49 @@ functions:
           path: /auth/sign-up
           method: post
 
+  signIn:
+    handler: src/main/functions/auth/signInHandler.handler
+    events:
+      - httpApi:
+          path: /auth/sign-in
+          method: post
+
+  forgotPassword:
+    handler: src/main/functions/auth/forgotPasswordHandler.handler
+    events:
+      - httpApi:
+          path: /auth/forgot-password
+          method: post
+
+  confirmForgotPassword:
+    handler: src/main/functions/auth/confirmForgotPasswordHandler.handler
+    events:
+      - httpApi:
+          path: /auth/confirm-forgot-password
+          method: post
+
+  refreshToken:
+    handler: src/main/functions/auth/refreshTokenHandler.handler
+    events:
+      - httpApi:
+          path: /auth/refresh-token
+          method: post
+
   cognitoPreSignUpTrigger:
     handler: src/main/functions/auth/cognito/preSignUpTrigger.handler
     events:
       - cognitoUserPool:
           pool: ${self:custom.cognito.PoolName}
           trigger: PreSignUp
+          existing: true
+          forceDeploy: true
+
+  cognitoCustomEmailTrigger:
+    handler: src/main/functions/auth/cognito/customEmailTrigger.handler
+    events:
+      - cognitoUserPool:
+          pool: ${self:custom.cognito.PoolName}
+          trigger: CustomMessage
           existing: true
           forceDeploy: true
 
@@ -99,12 +150,12 @@ resources:
         # GenerateSecret: true
         ExplicitAuthFlows:
           - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
         TokenValidityUnits:
-          AccessToken: hours
-        AccessTokenValidity: 12
-        RefreshTokenRotation:
-          Feature: ENABLED
-          RetryGracePeriodSeconds: 0
+          AccessToken: minutes
+          RefreshToken: days
+        AccessTokenValidity: 5
+        RefreshTokenValidity: 7
 
     MainTable:
       Type: AWS::DynamoDB::Table
@@ -127,6 +178,10 @@ resources:
             AttributeType: S
           - AttributeName: GSI1SK
             AttributeType: S
+          - AttributeName: GSI2PK
+            AttributeType: S
+          - AttributeName: GSI2SK
+            AttributeType: S
         KeySchema:
           - AttributeName: PK
             KeyType: HASH
@@ -140,6 +195,17 @@ resources:
               - AttributeName: GSI1PK
                 KeyType: HASH
               - AttributeName: GSI1SK
+                KeyType: RANGE
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: GSI2
+            Projection:
+              ProjectionType: ALL
+            KeySchema:
+              - AttributeName: GSI2PK
+                KeyType: HASH
+              - AttributeName: GSI2SK
                 KeyType: RANGE
             ProvisionedThroughput:
               ReadCapacityUnits: 1
