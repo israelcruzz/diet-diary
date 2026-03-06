@@ -34,6 +34,19 @@ export class ProfileItem {
     return profileItem
   }
 
+   public static toEntity(profileItem: ProfileItem): Profile {
+      return new Profile({
+        accountId: profileItem.attr.accountId,
+        activityLevel: profileItem.attr.activityLevel,
+        birthDate: new Date(profileItem.attr.birthDate),
+        gender: profileItem.attr.gender,
+        goal: profileItem.attr.goal,
+        height: profileItem.attr.height,
+        weight: profileItem.attr.weight,
+        createdAt: new Date(profileItem.attr.accountId)
+      })
+    }
+
   public static getPK(accountId: string): ProfileItem.Keys["PK"] {
     return `ACCOUNT#${accountId}`
   }

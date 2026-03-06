@@ -34,11 +34,11 @@ export class AccountItem {
     )
   }
 
-  public toEntity(): Account {
+  public static toEntity(accountItem: AccountItem): Account {
     return new Account({
-      id: this.attr.id,
-      email: this.attr.email,
-      externalId: this.attr.externalId
+      id: accountItem.attr.id,
+      email: accountItem.attr.email,
+      externalId: accountItem.attr.externalId
     })
   }
 

@@ -63,6 +63,14 @@ functions:
           method: post
           authorizer: CognitoAuthorizer
 
+  me:
+    handler: src/main/functions/account/meHandler.handler
+    events:
+      - httpApi:
+          path: /me
+          method: get
+          authorizer: CognitoAuthorizer
+
   signUp:
     handler: src/main/functions/auth/signUpHandler.handler
     events:
